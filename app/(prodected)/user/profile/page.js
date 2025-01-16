@@ -1,153 +1,170 @@
-"use client"; // Komponent renderowany po stronie klienta
+"use client";
 
-import { useEffect, useState } from "react"; // Importujemy hooki Reacta
-import { useRouter } from "next/navigation"; // Router do nawigacji
-import { useAuth } from "@/app/lib/AuthContext"; // Importujemy kontekst autoryzacji
-import { signOut } from "firebase/auth"; // Funkcja wylogowania z Firebase
-import { auth, db } from "@/app/lib/firebase"; // Import Firebase
-import { doc, setDoc, getDoc } from "firebase/firestore"; // Funkcje do obsługi Firestore
+import { useEffect } from "react";
+import { useForm } from "react-hook-form"; // Import React Hook Form
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/app/lib/AuthContext";
+import { signOut } from "firebase/auth";
+import { auth, db } from "@/app/lib/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 export default function ProfilePage() {
-  const { user } = useAuth(); // Pobieramy informacje o użytkowniku
-  const router = useRouter(); // Router do nawigacji
-  const [loading, setLoading] = useState(true); // Stan ładowania
-  const [street, setStreet] = useState(""); // Pole ulicy
-  const [city, setCity] = useState(""); // Pole miasta
-  const [zipCode, setZipCode] = useState(""); // Pole kodu pocztowego
+  const { user } = useAuth();
+  const router = useRouter();
+  const {
+    register,
+    setValue,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm({
+    defaultValues: {
+      street: "",
+      city: "",
+      zipCode: "",
+      avatarColor: "#4682B4",
+    },
+  });
 
+  const avatarColor = watch("avatarColor"); // Śledzenie zmiany koloru w czasie rzeczywistym
+
+  // Pobieranie danych użytkownika i ustawienie w formularzu
   useEffect(() => {
-    // Sprawdzanie, czy użytkownik jest zalogowany
+    const fetchUserData = async () => {
+      try {
+        const docRef = doc(db, "users", user?.uid);
+        const snapshot = await getDoc(docRef);
+
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (data.address) {
+            setValue("street", data.address.street || "");
+            setValue("city", data.address.city || "");
+            setValue("zipCode", data.address.zipCode || "");
+          }
+          if (data.avatar) {
+            setValue("avatarColor", data.avatar.color || "#4682B4");
+          }
+        }
+      } catch (error) {
+        console.error("Błąd podczas pobierania danych użytkownika:", error);
+      }
+    };
+
     if (!user) {
       router.push("/notfound");
     } else {
-      setLoading(false);
-      fetchUserAddress(); // Pobieramy adres użytkownika
+      fetchUserData();
     }
-  }, [user, router]);
+  }, [user, router, setValue]);
 
-  const fetchUserAddress = async () => {
-    try {
-      const docRef = doc(db, "users", user.uid); // Pobieranie dokumentu użytkownika
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.address) {
-          setStreet(data.address.street || "");
-          setCity(data.address.city || "");
-          setZipCode(data.address.zipCode || "");
-        }
-      }
-    } catch (error) {
-      console.error("Błąd podczas pobierania adresu:", error);
-    }
-  };
-
+  // Obsługa wylogowania
   const handleLogout = async () => {
     try {
       await signOut(auth);
       router.push("/user/login");
     } catch (error) {
-      console.error("Error logging out:", error);
+      console.error("Błąd podczas wylogowania:", error);
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
+  // Obsługa wysyłania formularza
+  const onSubmit = async (data) => {
     try {
-      const docRef = doc(db, "users", user.uid); // Tworzenie/aktualizacja dokumentu użytkownika
-      await setDoc(docRef, {
-        address: {
-          street,
-          city,
-          zipCode,
+      const docRef = doc(db, "users", user.uid);
+      await setDoc(
+        docRef,
+        {
+          address: {
+            street: data.street,
+            city: data.city,
+            zipCode: data.zipCode,
+          },
+          avatar: {
+            color: data.avatarColor,
+          },
         },
-      }, { merge: true });
+        { merge: true }
+      );
 
-      alert("Address updated successfully!");
+      alert("Dane zostały zaktualizowane!");
     } catch (error) {
-      console.error("Błąd podczas aktualizacji adresu:", error);
+      console.error("Błąd podczas aktualizacji danych użytkownika:", error);
     }
   };
 
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen w-full bg-gray-100">Loading...</div>;
-  }
-
+  // Generowanie inicjałów użytkownika
   const userInitials = (user?.displayName || user?.email || "User")
     .split(" ")
     .map((word) => word.charAt(0))
     .join("")
     .toUpperCase();
 
-  const colors = ["#FF6347", "#4682B4", "#32CD32", "#FFD700", "#8A2BE2"];
-  const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-gradient-to-r from-teal-400 via-blue-500 to-indigo-600 text-white p-6">
-      {/* Nagłówek */}
+      {/* Nagłówek z avatarem */}
       <h1 className="text-5xl font-bold text-center mb-4">Welcome, {userInitials}</h1>
-
-      {/* Avatar */}
       <div
         className="w-40 h-40 flex items-center justify-center rounded-full text-4xl font-bold shadow-lg mb-6"
-        style={{ backgroundColor: randomColor }}
+        style={{ backgroundColor: avatarColor }}
       >
         {userInitials}
       </div>
 
-      {/* Formularz aktualizacji adresu */}
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Update Address</h2>
-
+      {/* Formularz aktualizacji */}
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="bg-white p-6 rounded-lg shadow-md w-full max-w-md"
+      >
+        <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">
+          Update Address and Avatar
+        </h2>
         <div className="mb-4">
           <label htmlFor="street" className="block text-gray-700 font-semibold mb-2">
             Street:
           </label>
           <input
             id="street"
-            type="text"
-            placeholder="Enter street"
-            value={street}
-            onChange={(e) => setStreet(e.target.value)}
+            {...register("street")}
             className="p-2 bg-gray-100 text-gray-800 rounded-md focus:ring-2 focus:ring-blue-500 w-full"
           />
         </div>
-
         <div className="mb-4">
           <label htmlFor="city" className="block text-gray-700 font-semibold mb-2">
             City:
           </label>
           <input
             id="city"
-            type="text"
-            placeholder="Enter city"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
+            {...register("city")}
             className="p-2 bg-gray-100 text-gray-800 rounded-md focus:ring-2 focus:ring-blue-500 w-full"
           />
         </div>
-
         <div className="mb-4">
           <label htmlFor="zipCode" className="block text-gray-700 font-semibold mb-2">
             ZIP Code:
           </label>
           <input
             id="zipCode"
-            type="text"
-            placeholder="Enter ZIP Code"
-            value={zipCode}
-            onChange={(e) => setZipCode(e.target.value)}
+            {...register("zipCode")}
             className="p-2 bg-gray-100 text-gray-800 rounded-md focus:ring-2 focus:ring-blue-500 w-full"
           />
         </div>
-
+        <div className="mb-4">
+          <label htmlFor="avatarColor" className="block text-gray-700 font-semibold mb-2">
+            Avatar Color:
+          </label>
+          <input
+            id="avatarColor"
+            type="color"
+            {...register("avatarColor")}
+            className="w-full h-10"
+          />
+        </div>
         <button
           type="submit"
           className="w-full px-4 py-2 bg-blue-600 text-white font-bold rounded-md hover:bg-blue-700 transition"
         >
-          Update Address
+          Update Address and Avatar
         </button>
       </form>
 
