@@ -28,12 +28,20 @@ function SideBar({ children }) {
               Login
             </Link>
           </li>
-          <li>
+          <li className="mb-4">
             <Link
               href="/user/profile"
               className="block p-2 text-lg font-semibold hover:bg-gray-200 rounded-lg transition"
             >
               Profile
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/user/articles"
+              className="block p-2 text-lg font-semibold hover:bg-gray-200 rounded-lg transition"
+            >
+              Articles
             </Link>
           </li>
         </ul>

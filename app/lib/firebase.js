@@ -1,7 +1,20 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { 
+  getAuth, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut 
+} from "firebase/auth";
+import { 
+  getFirestore, 
+  collection, 
+  getDocs, 
+  addDoc, 
+  query, 
+  where 
+} from "firebase/firestore";
 
-// Twoja konfiguracja Firebase
+// Konfiguracja Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyCuZpWnRf0EgfAOq0axuhvZsbbTnIuT2Gw",
   authDomain: "lab5-27e91.firebaseapp.com",
@@ -11,17 +24,20 @@ const firebaseConfig = {
   appId: "1:703615843516:web:6a7f9a725c1f4bd0ace4b9",
 };
 
-const app = initializeApp(firebaseConfig); // Upewnij się, że ta linia działa poprawnie
-const auth = getAuth(app); // Używamy inicjalizowanego auth
+// Inicjalizacja Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 // Funkcja rejestracji użytkownika
 export const registerWithEmailAndPassword = async (email, password) => {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    console.log("Rejestracja zakończona sukcesem:", userCredential.user);
     return userCredential.user;
   } catch (error) {
-    console.error("Registration error:", error);
-    throw new Error(error.message); // Wyrzucamy błąd, jeśli wystąpił
+    console.error("Błąd rejestracji:", error.message);
+    throw new Error(error.message);
   }
 };
 
@@ -29,20 +45,71 @@ export const registerWithEmailAndPassword = async (email, password) => {
 export const loginWithEmailAndPassword = async (email, password) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    console.log("Logowanie zakończone sukcesem:", userCredential.user);
     return userCredential.user;
   } catch (error) {
-    console.error("Login error:", error);
-    throw new Error(error.message); // Wyrzucamy błąd, jeśli wystąpił
+    console.error("Błąd logowania:", error.message);
+    throw new Error(error.message);
   }
 };
 
 // Funkcja wylogowywania użytkownika
 export const logoutUser = async () => {
   try {
-    await signOut(auth); // Wylogowujemy użytkownika
+    await signOut(auth);
+    console.log("Wylogowano użytkownika");
   } catch (error) {
-    console.error("Error logging out:", error);
+    console.error("Błąd podczas wylogowywania:", error.message);
+    throw new Error(error.message);
   }
 };
 
-export { auth }; // Eksportujemy auth, aby można było go używać w innych częściach aplikacji
+// Funkcja do pobierania artykułów zalogowanego użytkownika
+export const getArticles = async () => {
+  const articles = [];
+  try {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.error("Nie zalogowano użytkownika.");
+      return articles;
+    }
+
+    const q = query(
+      collection(db, "articles"),
+      where("userId", "==", currentUser.uid)
+    );
+
+    const querySnapshot = await getDocs(q);
+    querySnapshot.forEach((doc) => {
+      articles.push({ id: doc.id, ...doc.data() });
+    });
+    return articles;
+  } catch (error) {
+    console.error("Błąd pobierania artykułów:", error);
+    throw new Error(error.message);
+  }
+};
+
+// Funkcja do dodawania artykułów
+export const addArticle = async (article) => {
+  try {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error("Użytkownik nie jest zalogowany.");
+    }
+
+    const newArticle = {
+      ...article,
+      userId: currentUser.uid, // Dodaj userId
+    };
+
+    const docRef = await addDoc(collection(db, "articles"), newArticle);
+    console.log("Artykuł dodany z ID:", docRef.id);
+  } catch (error) {
+    console.error("Błąd dodawania artykułu:", error.message);
+    throw new Error(error.message);
+  }
+};
+
+// Eksport obiektów Firebase
+export { auth, db };
