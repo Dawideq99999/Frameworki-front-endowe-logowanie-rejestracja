@@ -6,3 +6,5 @@ npx playwright test --debug
 npx playwright test example.spec.js --grep "Login page test"
 npx playwright test
 npx playwright test --workers=1
+
+https://lab5-27e91.web.app
